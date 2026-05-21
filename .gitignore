@@ -1,0 +1,22 @@
+# ignore executables
+hedge_table
+hedge_db
+
+# clangd
+**/.cache/*
+
+# cmake
+**/build/*
+
+# install directory
+hedgedb/*
+
+# ignore outcome.hpp (downloaded file)
+include/outcome.hpp
+
+# experiments and bench directory, also random stuff
+experiments/**
+
+# ignore rocksdb test stuff
+rocksdb/rocksdb*
+rocksdb/*.zip

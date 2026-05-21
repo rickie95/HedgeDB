@@ -1,0 +1,131 @@
+#pragma once
+
+#include <deque>
+#include <memory>
+#include <optional>
+#include <variant>
+#include <vector>
+
+#include <error.hpp>
+
+#include "db/memtable.h"
+#include "db/merge/merge_utils.h"
+#include "db/merge/sst_stream.h"
+#include "db/sst.h"
+#include "tmc/task.hpp"
+#include "types.h"
+
+namespace hedge::db
+{
+    using scan_source_t = std::variant<sst_stream*, memtable_cursor*>;
+
+    inline bool source_is_eof(const scan_source_t& s)
+    {
+        return std::visit([](auto* p)
+                          { return p->is_eof(); }, s);
+    }
+
+    inline bool source_buffer_empty(const scan_source_t& s)
+    {
+        return std::visit([](auto* p)
+                          { return p->buffer_empty(); }, s);
+    }
+
+    inline hedge::expected<merge_entry_t> source_pop_entry(const scan_source_t& s)
+    {
+        return std::visit(
+            [](auto* p) -> hedge::expected<merge_entry_t>
+            {
+                merge_entry_t e{
+                    .key = key_t{p->front().key()},
+                    .value = value_buffer_t{p->front().value()},
+                    .epoch = p->epoch()};
+                auto ok = p->pop_front();
+
+                if(!ok) [[unlikely]]
+                    return ok.error();
+
+                return e;
+            },
+            s);
+    }
+
+    class range_iterator
+    {
+        using sst_ptr_t = std::shared_ptr<sst>;
+
+        struct slot_t
+        {
+            merge_entry_t entry{};
+            scan_source_t source;
+        };
+
+        struct heap_item_t
+        {
+            slot_t* slot;
+        };
+
+        memtable::snapshot _memtable_snapshot;
+        std::vector<sst_ptr_t> _ssts;
+        std::unique_ptr<sst_stream_set> _rbufs;
+        std::vector<memtable_cursor> _mem_cursors;
+
+        std::optional<key_t> _lower;
+        std::optional<key_t> _upper;
+
+        deduplicator _dedup;
+        std::deque<slot_t> _slots;
+        std::vector<heap_item_t> _heap;
+
+        bool _initialized{false};
+        bool _exhausted{false};
+
+        static auto _heap_cmp()
+        {
+            return [](const heap_item_t& lhs, const heap_item_t& rhs)
+            {
+                auto cmp = lhs.slot->entry.key <=> rhs.slot->entry.key;
+                if(cmp != 0)
+                    return cmp > 0;                                   // min-heap by key
+                return lhs.slot->entry.epoch < rhs.slot->entry.epoch; // higher epoch pops first (newer wins)
+            };
+        }
+
+        tmc::task<hedge::status> _refresh_buffers();
+        tmc::task<hedge::status> _init();
+        expected<std::pair<key_t, std::vector<std::byte>>> _emit(merge_entry_t& item);
+        tmc::task<hedge::expected<std::pair<key_t, std::vector<std::byte>>>> _next_inner();
+
+    public:
+        range_iterator(
+            memtable::snapshot snapshot,
+            std::vector<sst_ptr_t> ssts,
+            std::unique_ptr<sst_stream_set> rbufs,
+            std::optional<key_t> lower,
+            std::optional<key_t> upper);
+
+        range_iterator(range_iterator&&) = default;
+        range_iterator& operator=(range_iterator&&) = default;
+        range_iterator(const range_iterator&) = delete;
+        range_iterator& operator=(const range_iterator&) = delete;
+
+        /// Returns the next key-value pair in the range, or errc::END_OF_SCAN when exhausted.
+        /// Tombstones are skipped.
+        [[nodiscard]] tmc::task<expected<std::pair<key_t, std::vector<std::byte>>>> next();
+
+        static hedge::expected<range_iterator> make_new(
+            memtable* memtable,
+            const partition_t* partition,
+            std::optional<key_t> lower,
+            std::optional<key_t> upper,
+            size_t read_ahead_size = 4 * KiB);
+
+        static hedge::expected<range_iterator> make_new(
+            memtable::snapshot snapshot,
+            const partition_t* partition,
+            std::optional<key_t> lower,
+            std::optional<key_t> upper,
+            size_t read_ahead_size = 4 * KiB);
+    };
+
+} // namespace hedge::db
