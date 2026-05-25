@@ -21,13 +21,14 @@ jobs:
             cmake \
             gcc-14 g++-14 \
             libxxhash-dev \
-            libhwloc-dev \
+            libhwloc-dev
 
-      - name: build and install liburing
-        run: chmod +x install_liburing.sh && bash ./install_liburing.sh
-
-      - name: build and install jemalloc
-        run: chmod +x install_jemalloc.sh && bash ./install_jemalloc.sh
+      - name: build and install liburing and jemalloc
+        run: |
+          chmod +x install_liburing.sh install_jemalloc.sh
+          bash ./install_liburing.sh &
+          bash ./install_jemalloc.sh &
+          wait
 
       - name: configure cmake
         env:
@@ -55,13 +56,14 @@ jobs:
             cmake \
             gcc-15 g++-15 \
             libxxhash-dev \
-            libhwloc-dev \
+            libhwloc-dev
 
-      - name: build and install liburing
-        run: chmod +x install_liburing.sh && bash ./install_liburing.sh
-
-      - name: build and install jemalloc
-        run: chmod +x install_jemalloc.sh && bash ./install_jemalloc.sh
+      - name: build and install liburing and jemalloc
+        run: |
+          chmod +x install_liburing.sh install_jemalloc.sh
+          bash ./install_liburing.sh &
+          bash ./install_jemalloc.sh &
+          wait
 
       - name: configure cmake
         env:
