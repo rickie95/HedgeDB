@@ -37,3 +37,37 @@ jobs:
 
       - name: build 
         run: cmake --build build -j$(nproc)
+
+  build-gcc15:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:25.10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: install deps
+        run: |
+          apt-get update
+          apt-get install -y \
+            build-essential \
+            cmake \
+            gcc-15 g++-15 \
+            libxxhash-dev \
+            libhwloc-dev \
+
+      - name: build and install liburing
+        run: chmod +x install_liburing.sh && bash ./install_liburing.sh
+
+      - name: build and install jemalloc
+        run: chmod +x install_jemalloc.sh && bash ./install_jemalloc.sh
+
+      - name: configure cmake
+        env:
+          CC: gcc-15
+          CXX: g++-15
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_JEMALLOC=1 -DBUILD_TESTS=0 -Wno-dev
+
+      - name: build
+        run: cmake --build build -j$(nproc)
