@@ -9,8 +9,12 @@ jobs:
   build:
     strategy:
       matrix:
-        compiler: [14, 15]
-    runs-on: ubuntu-24.04
+        include:
+          - os: ubuntu-24.04
+            compiler: 14
+          - os: ubuntu-25.10
+            compiler: 15
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,5 +42,5 @@ jobs:
           CXX: g++-${{ matrix.compiler }}
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_JEMALLOC=1 -DBUILD_TESTS=0 -Wno-dev
 
-      - name: build 
+      - name: build
         run: cmake --build build -j$(nproc)
