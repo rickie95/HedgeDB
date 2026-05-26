@@ -21,7 +21,7 @@ endif()
 file(
     DOWNLOAD
     "https://raw.githubusercontent.com/ned14/outcome/8b25c1713ebb2590981d8c4bc176d028026bdf8a/single-header/outcome.hpp"
-    ${CMAKE_SOURCE_DIR}/include/outcome.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/outcome.hpp
     EXPECTED_HASH SHA256=2b9d92acca21cc9294e138c848630c8992edc3540f4fb4819a3b396e9d8a2ccc
     SHOW_PROGRESS
 )
@@ -114,6 +114,13 @@ set(DB_SOURCES
 
 # hedgedb: async I/O executor (io_uring + TooManyCooks)
 add_library(hedgedb_io STATIC ${IO_EXECUTOR_SRCS})
+set_target_properties(hedgedb_io PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(hedgedb_io PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${xxhashct_SOURCE_DIR}
+    ${tmc_SOURCE_DIR}/include
+)
 target_link_libraries(hedgedb_io PUBLIC uring atomic)
 if(HWLOC_LIB)
     target_link_libraries(hedgedb_io PUBLIC hwloc)
@@ -121,6 +128,13 @@ endif()
 
 # hedgedb: full DB static library
 add_library(hedgedb STATIC ${DB_SOURCES})
+set_target_properties(hedgedb PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(hedgedb PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${xxhashct_SOURCE_DIR}
+    ${tmc_SOURCE_DIR}/include
+)
 target_link_libraries(hedgedb PUBLIC hedgedb_io xxhash)
 
 
